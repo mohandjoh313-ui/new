@@ -1,0 +1,59 @@
+name: Extract INGCO V44 Project
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "*.zip"
+      - ".github/workflows/unzip.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  unzip:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Find and extract ZIP
+        run: |
+          ZIP=$(find . -maxdepth 1 -type f -name "*.zip" | head -n 1)
+
+          if [ -z "$ZIP" ]; then
+            echo "No ZIP file found."
+            exit 1
+          fi
+
+          echo "Extracting: $ZIP"
+
+          mkdir -p .extract_tmp
+          unzip -o "$ZIP" -d .extract_tmp
+
+          # إذا الـZIP يحتوي مجلد مشروع واحد، ننقل محتوياته للجذر
+          if [ "$(find .extract_tmp -mindepth 1 -maxdepth 1 | wc -l)" -eq 1 ] && \
+             [ -d "$(find .extract_tmp -mindepth 1 -maxdepth 1)" ]; then
+            cp -a "$(find .extract_tmp -mindepth 1 -maxdepth 1)"/. .
+          else
+            cp -a .extract_tmp/. .
+          fi
+
+          rm -rf .extract_tmp
+
+      - name: Commit extracted files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add -A
+
+          if git diff --cached --quiet; then
+            echo "Nothing to commit."
+          else
+            git commit -m "Extract INGCO V44 Android project"
+            git push
+          fi
